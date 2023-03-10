@@ -8,6 +8,7 @@ package etu2043.framework.servlet;
 
 
 import etu2043.framework.Mapping;
+import jakarta.servlet.ServletConfig;
 import java.io.IOException;
 import java.io.PrintWriter;
 import jakarta.servlet.ServletException;
@@ -24,13 +25,10 @@ import java.util.HashMap;
 public class FrontServlet extends HttpServlet { 
     HashMap<String,Mapping> mappingUrls;
 
-    public HashMap<String, Mapping> getMappingUrls() {
-        return mappingUrls;
+    public void init(ServletConfig config) throws ServletException {
+        super.init(config);
     }
-
-    public void setMappingUrls(HashMap<String, Mapping> mappingUrls) {
-        this.mappingUrls = mappingUrls;
-    }
+    
     
     
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
@@ -91,5 +89,13 @@ public class FrontServlet extends HttpServlet {
     @Override
     public String getServletInfo() {
         return "Short description";
-    }// </editor-fold>   
+    }// </editor-fold> 
+    
+    public HashMap<String, Mapping> getMappingUrls() {
+        return mappingUrls;
+    }
+
+    public void setMappingUrls(HashMap<String, Mapping> mappingUrls) {
+        this.mappingUrls = mappingUrls;
+    }
 }
