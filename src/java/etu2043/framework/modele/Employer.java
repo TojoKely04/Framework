@@ -16,13 +16,13 @@ public class Employer {
     String nom;
 
     @Url(lien="emp_all")
-    public void findAll(){
-        System.out.println("Find All Employer");
+    public String findAll(){
+        return "Find All Employer";
     }
     
     @Url(lien="add_emp")
-    public void addEmp(){
-        System.out.println("Add Employer");
+    public String addEmp(){
+        return "Add Employer";
     }
     
     public int getId() {

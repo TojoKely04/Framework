@@ -17,13 +17,13 @@ public class Departement {
     String addresse;
 
     @Url(lien="dept_all")
-    public void findAll(){
-        System.out.println("Find All Departement");
+    public String findAll(){
+        return "Find All Departement";
     }
     
     @Url(lien="dept_update")
-    public void update(){
-        System.out.println("Update Departement");
+    public String update(){
+        return "Update Departement";
     }
     
     public int getId() {
