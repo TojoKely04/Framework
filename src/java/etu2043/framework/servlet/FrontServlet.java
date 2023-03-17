@@ -37,7 +37,8 @@ public class FrontServlet extends HttpServlet {
 
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
-        HashMap<String,Mapping> mappingUrls = FrontServlet.getAllMapping();
+        String pkg = this.getInitParameter("package_modele");
+        HashMap<String,Mapping> mappingUrls = FrontServlet.getAllMapping(pkg);
         this.setMappingUrls(mappingUrls);
     }
     
@@ -138,9 +139,9 @@ public class FrontServlet extends HttpServlet {
         this.mappingUrls = mappingUrls;
     }
     
-    public static HashMap<String,Mapping> getAllMapping(){
+    public static HashMap<String,Mapping> getAllMapping(String pkg){
         HashMap<String , Mapping> mappingUrls = new HashMap<String,Mapping>();
-        Set<Method> method = new Reflections("etu2043.framework.modele",new MethodAnnotationsScanner()).getMethodsAnnotatedWith(Url.class);
+        Set<Method> method = new Reflections(pkg,new MethodAnnotationsScanner()).getMethodsAnnotatedWith(Url.class);
         Iterator<Method> itr = method.iterator();
         while(itr.hasNext()){
             Method m = itr.next();
