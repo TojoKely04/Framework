@@ -8,14 +8,17 @@ package etu2043.framework.servlet;
 
 
 import etu2043.framework.Mapping;
+import etu2043.framework.ModelView;
 import etu2043.framework.annotation.Url;
 import jakarta.servlet.ServletConfig;
 import java.io.IOException;
 import java.io.PrintWriter;
+import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletContext;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Enumeration;
@@ -25,8 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.reflections.Reflections;
-import org.reflections.scanners.MethodAnnotationsScanner;
+import java.lang.annotation.Annotation;
 
 /**
  *
@@ -37,56 +39,70 @@ public class FrontServlet extends HttpServlet {
 
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
-        String pkg = this.getInitParameter("package_modele");
-        HashMap<String,Mapping> mappingUrls = FrontServlet.getAllMapping(pkg);
-        this.setMappingUrls(mappingUrls);
+        // String pkg = this.getInitParameter("package_modele");
+        HashMap<String,Mapping> mappingUrl =  new HashMap<String,Mapping>();
+        // Obtenez le ServletContext
+        ServletContext context = getServletContext();
+        // Obtenez tous les noms des fichiers dans le package pkg
+        String path = "/WEB-INF/classes/"+this.getInitParameter("package");
+
+        Set<String> classNames = context.getResourcePaths(path);
+        for (String className : classNames) {
+            if (className.endsWith(".class")) {
+                // Supprimez l'extension ".class" du nom de fichier pour obtenir le nom de classe
+                String fullClassName = className.substring(0, className.length() - 6);
+                int taille = fullClassName.split("/").length;
+                fullClassName = fullClassName.split("/")[taille-2]+"."+fullClassName.split("/")[taille-1];
+                try {
+                    // Chargez la classe
+                    Class<?> myClass = Class.forName(fullClassName);
+                    // Appelez une méthode de l'objet
+                    Method[] m = myClass.getDeclaredMethods();
+                    for (int i = 0; i < m.length; i++) {
+                        Annotation[] a = m[i].getAnnotations();
+                        for (int j = 0; j < a.length; j++) {
+                            if(a[j].annotationType()==Url.class)
+                            {
+                                Url u=(Url)a[j];
+                                Mapping map=new Mapping(myClass.getSimpleName(),m[i].getName());
+                                mappingUrl.put(u.lien(),map);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    System.out.println("Impossible de charger la classe " + fullClassName + ": " + e.getMessage());
+                }
+            }
+        }
+
+        this.setMappingUrls(mappingUrl);
     }
     
     
     
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
-        PrintWriter out = response.getWriter();
-        out.println("Servlet : Front Servlet");
-        out.println("");
-        out.println("Context Path :"+request.getContextPath());
-        out.println("");
-        out.println("URL :"+request.getRequestURL());
-        out.println("");
-        out.println("Parametre :");
-        Enumeration<String> liste = request.getParameterNames();
-        while(liste.hasMoreElements()){
-            String element = liste.nextElement();
-            String[] elementValues = request.getParameterValues(element);
-            for(int i=0 ; i<elementValues.length ; i++){
-                out.println(element+" "+(i+1)+" : "+elementValues[i]);
-            }
-        }
-        out.println("");
+        String lienMapping = String.valueOf(request.getRequestURL());
+        String[] split  = lienMapping.split("/");
 
-        out.println("Mapping Urls :");
+        PrintWriter out = response.getWriter();
         HashMap<String,Mapping> mappingUrls = this.getMappingUrls();
         Set keys = mappingUrls.keySet();
         Iterator itr = keys.iterator();
+
         while(itr.hasNext()){
             String key = (String) itr.next();
-            out.print("Key : "+key+" , ");
-            out.println("Value : Class: "+mappingUrls.get(key).getClassName()+", Method: "+mappingUrls.get(key).getMethod());
-        }
-        
-        out.println("");
-        itr = keys.iterator();
-        while(itr.hasNext()){
-            String key = (String) itr.next();
-            if(key.equals(request.getHttpServletMapping().getMatchValue())){
+            if(key.equals(split[4])){
                 try {
-                    Class<?> classMapping = Class.forName("etu2043.framework.modele."+mappingUrls.get(key).getClassName());
+                    Class<?> classMapping = Class.forName("modele."+mappingUrls.get(key).getClassName());
                     Object objet = classMapping.newInstance();
                     Method method = objet.getClass().getMethod(mappingUrls.get(key).getMethod());
-                    out.println("Action : "+String.valueOf(method.invoke(objet)));
+                    
+                    String mv = (String)method.invoke(objet);
+                    out.println(mv);
+                    
                 } catch (Exception ex) {
-                    out.println(ex.getMessage());
+                    out.println(ex);
                 }
             }
         }
@@ -137,24 +153,5 @@ public class FrontServlet extends HttpServlet {
 
     public void setMappingUrls(HashMap<String, Mapping> mappingUrls) {
         this.mappingUrls = mappingUrls;
-    }
-    
-    public static HashMap<String,Mapping> getAllMapping(String pkg){
-        HashMap<String , Mapping> mappingUrls = new HashMap<String,Mapping>();
-        Set<Method> method = new Reflections(pkg,new MethodAnnotationsScanner()).getMethodsAnnotatedWith(Url.class);
-        Iterator<Method> itr = method.iterator();
-        while(itr.hasNext()){
-            Method m = itr.next();
-            
-            Mapping tempMapping = new Mapping();
-            tempMapping.setClassName(m.getDeclaringClass().getSimpleName());
-            tempMapping.setMethod(m.getName());
-            
-            Url url = m.getAnnotation(Url.class);
-            String cle = url.lien();
-            
-            mappingUrls.put(cle, tempMapping);
-        }
-        return mappingUrls;
     }
 }
