@@ -1,7 +1,6 @@
 package modele;
 
 import etu2043.framework.annotation.Url;
-import java.util.HashMap;
 import etu2043.framework.*;
 import java.sql.Date;
 

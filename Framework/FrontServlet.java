@@ -39,14 +39,14 @@ public class FrontServlet extends HttpServlet {
         PrintWriter out = response.getWriter();
         String servletName = request.getServletPath().substring(1);
 
-        HashMap<String,Mapping> mappingUrls = this.getMappingUrls();
+        HashMap<String,Mapping> mappingUrls = this.getMappingUrls(); 
         Set<String> mappingUrlsKeys = mappingUrls.keySet();
 
         for(String key : mappingUrlsKeys){
             if(key.equals(servletName)){
                 try {
                     Class<?> classMapping = Class.forName(this.getInitParameter("package")+"."+mappingUrls.get(key).getClassName());
-                    Object objet = classMapping.newInstance();
+                    Object objet = classMapping.getDeclaredConstructor().newInstance();
                     
                     this.setObject(request,response,objet);
                     this.dispatchModelView(request , response , objet , key);
