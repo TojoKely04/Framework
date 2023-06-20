@@ -4,11 +4,14 @@ import etu2043.framework.FileUpload;
 import etu2043.framework.Mapping;
 import etu2043.framework.ModelView;
 import etu2043.framework.annotation.Scope;
+import etu2043.framework.annotation.Session;
 import etu2043.framework.annotation.Url;
+import etu2043.framework.annotation.Auth;
 import java.io.IOException;
 import java.io.PrintWriter;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -71,7 +74,7 @@ public class FrontServlet extends HttpServlet {
                 Class<?> classMapping = Class.forName(this.getInitParameter("package")+"."+mappingUrls.get(servletName).getClassName());
                 objet = classMapping.getDeclaredConstructor().newInstance();
             }
-            this.setObject(request,response,objet);
+            this.setObject(request,response,objet,servletName);
             this.dispatchModelView(request , response , objet , servletName);
 
         } catch (Exception ex) {
@@ -79,9 +82,10 @@ public class FrontServlet extends HttpServlet {
         }
     }
 
-    public void setObject(HttpServletRequest request , HttpServletResponse response , Object objet )
+    public void setObject(HttpServletRequest request , HttpServletResponse response , Object objet , String mappingUrlkey)
             throws Exception{
 
+        Method method = this.getMethodByUrl(objet,mappingUrlkey);
         Field[] attributs = objet.getClass().getDeclaredFields();
         String[] setters = new String[attributs.length];
         for(int i=0 ; i<attributs.length ; i++){
@@ -90,22 +94,36 @@ public class FrontServlet extends HttpServlet {
 
         for(int i=0 ; i<attributs.length ; i++){
             Method set = objet.getClass().getDeclaredMethod(setters[i], attributs[i].getType());
-            if(attributs[i].getType() == (new FileUpload()).getClass() && request.getContentType() != null && request.getContentType().toLowerCase().startsWith("multipart/form-data")){
-                Part filePart = request.getPart(attributs[i].getName());
-                if (filePart != null) {
-                    String fileName = filePart.getSubmittedFileName();
-                    byte[] fileBytes = convertToByteArray(filePart);
-                    FileUpload fileUpload = new FileUpload();
-                    fileUpload.setName(fileName);
-                    fileUpload.setBytes(fileBytes);
-                    set.invoke(objet,fileUpload);
+            if(attributs[i].getName().equals("session") && this.need_session(method)){
+                HashMap<String , Object> hashMapSessions = new HashMap<String,Object>();
+                HttpSession session = request.getSession();
+                Enumeration<String> attributeNames = session.getAttributeNames();
+                while (attributeNames.hasMoreElements()) {
+                    String attributeName = attributeNames.nextElement();
+                    Object attributeValue = session.getAttribute(attributeName);
+                    hashMapSessions.put(attributeName, attributeValue);
                 }
+                set.invoke(objet, hashMapSessions);
             }else{
-                String[] parameter = request.getParameterValues(attributs[i].getName());
-                if(parameter!=null){
-                    set.invoke(objet,FrontServlet.castStringToType(parameter,attributs[i].getType()));
+                
+                if(attributs[i].getType() == (new FileUpload()).getClass() && request.getContentType() != null && request.getContentType().toLowerCase().startsWith("multipart/form-data")){
+                    Part filePart = request.getPart(attributs[i].getName());
+                    if (filePart != null) {
+                        String fileName = filePart.getSubmittedFileName();
+                        byte[] fileBytes = convertToByteArray(filePart);
+                        FileUpload fileUpload = new FileUpload();
+                        fileUpload.setName(fileName);
+                        fileUpload.setBytes(fileBytes);
+                        set.invoke(objet,fileUpload);
+                    }
+                }else{
+                    String[] parameter = request.getParameterValues(attributs[i].getName());
+                    if(parameter!=null){
+                        set.invoke(objet,FrontServlet.castStringToType(parameter,attributs[i].getType()));
+                    }
                 }
             }
+            
         }
 
     }
@@ -139,14 +157,22 @@ public class FrontServlet extends HttpServlet {
     }
     public void dispatchModelView(HttpServletRequest request , HttpServletResponse response , Object objet , String mappingUrlkey)
             throws Exception{
+        HttpSession session = request.getSession();
+        String authKey_1 = this.getInitParameter("connected");
+        String authKey_2 = this.getInitParameter("profil");
+
         Method method = this.getMethodByUrl(objet,mappingUrlkey);
         Object[] parameters = this.getMethodParametersValues(request,response,method);
         
         ModelView mv = new ModelView();
-        if(parameters.length==0){
-            mv = (ModelView)method.invoke(objet);
-        }else if(parameters.length > 0){
-            mv = (ModelView)method.invoke(objet,parameters);
+        if(this.need_auth(method) && session.getAttribute(authKey_1)==null ){
+            this.dispatchToLogin(request,response);
+        }else if(!this.need_profil(method).equals("") && session.getAttribute(authKey_2)==null){
+            this.dispatchToLogin(request,response);
+        }else if(!this.need_profil(method).equals("") && session.getAttribute(authKey_2)!=null && !session.getAttribute(authKey_2).equals(need_profil(method))){
+            this.dispatchToLogin(request,response);
+        }else{
+            mv = this.getModelView(method, parameters , objet);
         }
         
         Set<String> mvKeys = mv.getData().keySet();
@@ -154,10 +180,71 @@ public class FrontServlet extends HttpServlet {
             request.setAttribute(mvKey , mv.getData().get(mvKey));
         }
 
+        if(mv.getAuth().get(authKey_1)!=null)
+        {
+            session.setAttribute(authKey_1,mv.getAuth().get(authKey_1));
+            if(mv.getAuth().get(authKey_2)!=null)
+            {
+                session.setAttribute(authKey_2,mv.getAuth().get(authKey_2));
+            }
+        }
+
         RequestDispatcher dispat = request.getRequestDispatcher(mv.getView());
         dispat.forward(request,response);
     }
 
+    public void dispatchToLogin(HttpServletRequest request , HttpServletResponse response) throws Exception
+    {
+        RequestDispatcher dispat = request.getRequestDispatcher("login.jsp");
+        dispat.forward(request,response);
+    }
+    public ModelView getModelView(Method method , Object[] parameters , Object objet) throws Exception
+    {
+        ModelView mv = new ModelView();
+        if(parameters.length==0){
+            mv = (ModelView)method.invoke(objet);
+        }else if(parameters.length > 0){
+            mv = (ModelView)method.invoke(objet,parameters);
+        }  
+        return mv;
+    }
+    public boolean need_auth(Method method)
+    {
+        Annotation[] annotations = method.getAnnotations();
+        for (int j = 0; j < annotations.length; j++) {
+            if(annotations[j].annotationType()==Auth.class)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    public String need_profil(Method method)
+    {
+        Annotation[] annotations = method.getAnnotations();
+        for (int j = 0; j < annotations.length; j++) {
+            if(annotations[j].annotationType()==Auth.class)
+            {
+                Auth auth=(Auth)annotations[j];
+                if(!auth.profil().equals(""))
+                {
+                    return auth.profil();
+                }
+            }
+        }
+        return "";
+    }
+    public boolean need_session(Method method)
+    {
+        Annotation[] annotations = method.getAnnotations();
+        for (int j = 0; j < annotations.length; j++) {
+            if(annotations[j].annotationType()==Session.class)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     public HashMap<String, Mapping> allMappingUrls(String pckg){
         HashMap<String, Mapping> mappingUrl = new HashMap<String, Mapping>();
 
