@@ -1,5 +1,6 @@
 package etu2043.framework;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 public class ModelView{
@@ -7,6 +8,8 @@ public class ModelView{
 	HashMap<String,Object> data;
 	HashMap<String,Object> auth;
 	boolean isJson;
+	boolean invalidateSession=false;
+	ArrayList<String> removeSession;
 
 	public boolean isJson() {
 		return isJson;
@@ -18,6 +21,7 @@ public class ModelView{
 	{
 		this.setData(new HashMap<String,Object>());
 		this.setAuth(new HashMap<String,Object>());
+		this.setRemoveSession(new ArrayList<String>());
 	}
 	public String getView(){
 		return this.view;
@@ -46,6 +50,21 @@ public class ModelView{
 	}
 	public void addAuth(String key , Object value){
 		this.auth.put(key,value);
+	}
+	public boolean isInvalidateSession() {
+		return invalidateSession;
+	}
+	public void setInvalidateSession(boolean invalidateSession) {
+		this.invalidateSession = invalidateSession;
+	}
+	public ArrayList<String> getRemoveSession() {
+		return removeSession;
+	}
+	public void setRemoveSession(ArrayList<String> removeSession) {
+		this.removeSession = removeSession;
+	}
+	public void addRemoveSession(String session){
+		this.removeSession.add(session);
 	}
 
 }
