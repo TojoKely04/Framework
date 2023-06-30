@@ -210,6 +210,13 @@ public class FrontServlet extends HttpServlet {
                 RequestDispatcher dispat = request.getRequestDispatcher(mv.getView());
                 dispat.forward(request,response);
             }
+
+            if(mv.isInvalidateSession()){
+                session.invalidate();
+            }
+            for(int i=0 ; i<mv.getRemoveSession().size() ; i++){
+                session.removeAttribute(mv.getRemoveSession().get(i));
+            }
         }
     }
 
